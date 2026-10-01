@@ -1,5 +1,6 @@
 package com.foenichs.uniqueloot.inventory
 
+import com.foenichs.uniqueloot.service.CompatService
 import net.minecraft.world.Container
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.item.ItemStack
@@ -11,7 +12,10 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
 import java.util.UUID
 
-class LootStorage(private val plugin: Plugin) {
+class LootStorage(
+    private val plugin: Plugin,
+    private val compat: CompatService
+) {
 
     /**
      * Storage key of a player's items on the chest
@@ -39,7 +43,7 @@ class LootStorage(private val plugin: Plugin) {
      * Saves a player's items on the chest
      */
     fun save(holder: Container, player: UUID, items: List<ItemStack>) {
-        val bytes = org.bukkit.inventory.ItemStack.serializeItemsAsBytes(items.map(CraftItemStack::asBukkitCopy))
+        val bytes = org.bukkit.inventory.ItemStack.serializeItemsAsBytes(items.map(compat::toBukkit))
         data(holder).set(key(player), PersistentDataType.BYTE_ARRAY, bytes)
         holder.setChanged()
     }

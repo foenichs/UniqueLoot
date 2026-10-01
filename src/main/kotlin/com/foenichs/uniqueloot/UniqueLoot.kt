@@ -5,6 +5,7 @@ import com.foenichs.uniqueloot.listener.ChestListener
 import com.foenichs.uniqueloot.listener.protection.BlockProtectionListener
 import com.foenichs.uniqueloot.listener.protection.EntityProtectionListener
 import com.foenichs.uniqueloot.listener.protection.ExplosionProtectionListener
+import com.foenichs.uniqueloot.service.CompatService
 import com.foenichs.uniqueloot.service.ContainerService
 import com.foenichs.uniqueloot.service.DialogService
 import com.foenichs.uniqueloot.service.LootService
@@ -22,11 +23,20 @@ class UniqueLoot : JavaPlugin() {
      * Creates the services and registers the listeners
      */
     override fun onEnable() {
+        // Initialize Compatibility
+        val compatService = try {
+            CompatService()
+        } catch (ex: Exception) {
+            return disableUnsupported(ex)
+        } catch (ex: LinkageError) {
+            return disableUnsupported(ex)
+        }
+
         // Initialize Storage
-        val storage = LootStorage(this)
+        val storage = LootStorage(this, compatService)
 
         // Initialize Services
-        val lootService = LootService(storage)
+        val lootService = LootService(storage, compatService)
         migrationService = MigrationService(this)
         containerService = ContainerService(lootService, migrationService)
         protectionService = ProtectionService()
@@ -46,6 +56,14 @@ class UniqueLoot : JavaPlugin() {
 
         // bStats
         Metrics(this, 27274)
+    }
+
+    /**
+     * Logs error message and disables the plugin
+     */
+    private fun disableUnsupported(ex: Throwable) {
+        logger.severe("This Minecraft version (${server.minecraftVersion}) isn't supported: ${ex.message}")
+        server.pluginManager.disablePlugin(this)
     }
 
     /**

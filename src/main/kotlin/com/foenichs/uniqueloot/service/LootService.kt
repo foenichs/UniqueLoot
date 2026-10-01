@@ -2,21 +2,23 @@ package com.foenichs.uniqueloot.service
 
 import com.foenichs.uniqueloot.inventory.LootStorage
 import com.foenichs.uniqueloot.inventory.PersonalContainer
-import net.minecraft.advancements.CriteriaTriggers
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.Container
+import net.minecraft.world.RandomizableContainer
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.vehicle.ContainerEntity
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.level.block.entity.BlockEntity
-import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity
 import net.minecraft.world.level.storage.loot.LootParams
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams
 import net.minecraft.world.phys.Vec3
 
-class LootService(private val storage: LootStorage) {
+class LootService(
+    private val storage: LootStorage,
+    private val compat: CompatService
+) {
 
     /**
      * Whether the container is a block entity or minecart with a loot table
@@ -39,7 +41,7 @@ class LootService(private val storage: LootStorage) {
     private fun generateLoot(level: ServerLevel, real: Container, target: Container, player: ServerPlayer) {
         val key = lootTable(real) ?: return
         val table = level.server.reloadableRegistries().getLootTable(key)
-        CriteriaTriggers.GENERATE_LOOT.trigger(player, key)
+        compat.triggerGenerateLoot(player, key)
         val params = LootParams.Builder(level)
             .withParameter(LootContextParams.ORIGIN, origin(real))
             .withLuck(player.luck)
@@ -53,7 +55,7 @@ class LootService(private val storage: LootStorage) {
      * The loot table of a block entity or minecart
      */
     private fun lootTable(container: Container) = when (container) {
-        is RandomizableContainerBlockEntity -> container.lootTable
+        is RandomizableContainer -> container.lootTable
         is ContainerEntity -> container.containerLootTable
         else -> null
     }

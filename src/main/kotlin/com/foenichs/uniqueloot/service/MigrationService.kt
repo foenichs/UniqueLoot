@@ -24,7 +24,7 @@ class MigrationService(private val plugin: Plugin) : AutoCloseable {
         val file = File(plugin.dataFolder, "uniqueLoot.db")
         if (!file.exists()) return null
 
-        plugin.logger.info("Found a legacy database, loot containers will be migrated on interact.")
+        plugin.logger.info("Found legacy database, loot containers will be migrated on interact.")
         return try {
             DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}")
         } catch (ex: Exception) {
