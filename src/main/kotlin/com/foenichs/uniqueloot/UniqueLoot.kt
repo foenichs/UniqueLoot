@@ -1,56 +1,61 @@
 package com.foenichs.uniqueloot
 
+import com.foenichs.uniqueloot.inventory.LootStorage
+import com.foenichs.uniqueloot.listener.ChestListener
+import com.foenichs.uniqueloot.listener.protection.BlockProtectionListener
+import com.foenichs.uniqueloot.listener.protection.EntityProtectionListener
+import com.foenichs.uniqueloot.listener.protection.ExplosionProtectionListener
+import com.foenichs.uniqueloot.service.ContainerService
+import com.foenichs.uniqueloot.service.DialogService
+import com.foenichs.uniqueloot.service.LootService
+import com.foenichs.uniqueloot.service.MigrationService
+import com.foenichs.uniqueloot.service.ProtectionService
+import org.bstats.bukkit.Metrics
 import org.bukkit.plugin.java.JavaPlugin
-import java.io.File
-import java.sql.Connection
-import java.sql.DriverManager
 
 class UniqueLoot : JavaPlugin() {
+    private lateinit var migrationService: MigrationService
+    private lateinit var containerService: ContainerService
+    private lateinit var protectionService: ProtectionService
 
-    lateinit var connection: Connection
-        private set
-
-    private lateinit var chestListener: ChestListener
-    private lateinit var protectionListener: ChestProtectionListener
-
+    /**
+     * Creates the services and registers the listeners
+     */
     override fun onEnable() {
-        // Ensure plugin folder exists
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs()
-        }
+        // Initialize Storage
+        val storage = LootStorage(this)
 
-        // Create or open SQLite database
-        val dbFile = File(dataFolder, "uniqueLoot.db")
-        connection = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
+        // Initialize Services
+        val lootService = LootService(storage)
+        migrationService = MigrationService(this)
+        containerService = ContainerService(lootService, migrationService)
+        protectionService = ProtectionService()
+        val dialogService = DialogService()
 
-        // Create table if it doesn't exist
-        connection.prepareStatement(
-            """
-            CREATE TABLE IF NOT EXISTS player_chest (
-                player_uuid TEXT NOT NULL,
-                chest_id   TEXT NOT NULL,
-                slot       INTEGER NOT NULL,
-                item_data  TEXT NOT NULL,
-                PRIMARY KEY(player_uuid, chest_id, slot)
-            );
-            """
-        ).use { stmt ->
-            stmt.executeUpdate()
-        }
+        // Register Event Listeners
+        val pluginManager = server.pluginManager
+        pluginManager.registerEvents(ChestListener(containerService), this)
 
-        // Register the chest listener
-        chestListener = ChestListener(this)
-        server.pluginManager.registerEvents(chestListener, this)
+        // Rule Enforcement
+        pluginManager.registerEvents(BlockProtectionListener(protectionService, dialogService), this)
+        pluginManager.registerEvents(EntityProtectionListener(protectionService, dialogService), this)
+        pluginManager.registerEvents(ExplosionProtectionListener(protectionService), this)
 
-        // Register the loot chest protection listener
-        protectionListener = ChestProtectionListener()
-        server.pluginManager.registerEvents(protectionListener, this)
+        // Keep loot minecarts at rest
+        server.scheduler.runTaskTimer(this, Runnable { protectionService.tick() }, 1L, 1L)
+
+        // bStats
+        Metrics(this, 27274)
     }
 
+    /**
+     * Saves open personal inventories, closes the old database and unlocks loot minecarts
+     */
     override fun onDisable() {
-        // Close database connection on shutdown
-        if (::connection.isInitialized && !connection.isClosed) {
-            connection.close()
-        }
+        if (::containerService.isInitialized) containerService.closeAll()
+        if (::migrationService.isInitialized) migrationService.close()
+
+        // Leave no state on entities
+        if (::protectionService.isInitialized) protectionService.unfreezeAll()
     }
 }

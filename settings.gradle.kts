@@ -1,1 +1,1 @@
-rootProject.name = "unique-loot"
+rootProject.name = "UniqueLoot"
