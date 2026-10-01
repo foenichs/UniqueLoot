@@ -1,7 +1,6 @@
 package com.foenichs.uniqueloot.service
 
 import net.minecraft.world.entity.vehicle.ContainerEntity
-import net.minecraft.world.level.block.ChestBlock
 import org.bukkit.GameMode
 import org.bukkit.Tag
 import org.bukkit.block.Barrel
@@ -10,8 +9,6 @@ import org.bukkit.block.BlockFace
 import org.bukkit.block.BlockState
 import org.bukkit.block.Chest
 import org.bukkit.block.data.type.Chest.Type
-import org.bukkit.craftbukkit.block.CraftBlock
-import org.bukkit.craftbukkit.block.data.CraftBlockData
 import org.bukkit.craftbukkit.entity.CraftMinecart
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
@@ -19,11 +16,13 @@ import org.bukkit.entity.minecart.StorageMinecart
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.loot.LootTable
 import org.bukkit.loot.Lootable
+import org.bukkit.util.Vector
 import java.util.UUID
 
 class ProtectionService {
     private val frozen = mutableSetOf<StorageMinecart>()
     private val removing = mutableSetOf<UUID>()
+    private val horizontal = listOf(BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST)
 
     /**
      * Whether the block is a chest or barrel with a loot table
@@ -89,7 +88,7 @@ class ProtectionService {
      * Locks a loot minecart in place until the plugin is disabled, nothing is saved on the entity
      */
     fun freeze(minecart: StorageMinecart) {
-        (minecart as CraftMinecart).handle.maxSpeed = 0.0
+        minecart.maxSpeed = 0.0
         frozen.add(minecart)
     }
 
@@ -114,7 +113,8 @@ class ProtectionService {
     fun tick() {
         val minecarts = frozen.iterator()
         while (minecarts.hasNext()) {
-            val handle = (minecarts.next() as CraftMinecart).handle
+            val minecart = minecarts.next()
+            val handle = (minecart as CraftMinecart).handle
             // No longer a loot minecart
             if ((handle as ContainerEntity).containerLootTable == null) {
                 handle.maxSpeed = null
@@ -122,10 +122,9 @@ class ProtectionService {
                 continue
             }
 
-            val velocity = handle.deltaMovement
-            if (velocity.horizontalDistanceSqr() < 1.0E-7) continue
-            handle.setDeltaMovement(0.0, velocity.y, 0.0)
-            handle.hurtMarked = true
+            val velocity = minecart.velocity
+            if (velocity.x * velocity.x + velocity.z * velocity.z < 1.0E-7) continue
+            minecart.velocity = Vector(0.0, velocity.y, 0.0)
         }
     }
 
@@ -143,9 +142,14 @@ class ProtectionService {
     fun separateFromLootChest(block: Block) {
         val data = block.blockData as? org.bukkit.block.data.type.Chest ?: return
         if (data.type == Type.SINGLE) return
-        val partnerFace = CraftBlock.notchToBlockFace(ChestBlock.getConnectedDirection((data as CraftBlockData).state))
+        val partnerFace = if (data.type == Type.LEFT) turn(data.facing, 1) else turn(data.facing, 3)
         if (!isLootChest(block.getRelative(partnerFace))) return
         data.type = Type.SINGLE
         block.setBlockData(data, false)
     }
+
+    /**
+     * The horizontal face a number of clockwise quarter turns away, seen from above
+     */
+    private fun turn(face: BlockFace, quarterTurns: Int) = horizontal[(horizontal.indexOf(face) + quarterTurns) % 4]
 }
