@@ -36,6 +36,7 @@ class MigrationService(private val plugin: Plugin) : AutoCloseable {
     /**
      * Items a player saved in a legacy version for each half of the container, null if they never opened it
      */
+    @Synchronized
     fun load(player: UUID, world: UUID, halves: List<Container>): List<List<ItemStack>>? {
         val connection = connection ?: return null
         val positions = halves.map { (it as? BlockEntity)?.blockPos ?: return null }

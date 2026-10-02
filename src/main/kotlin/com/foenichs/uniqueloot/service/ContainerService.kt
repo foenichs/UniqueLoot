@@ -19,12 +19,13 @@ import net.minecraft.world.level.block.ChestBlock
 import net.minecraft.world.level.block.TrappedChestBlock
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
 import net.minecraft.world.level.gameevent.GameEvent
+import java.util.concurrent.ConcurrentHashMap
 
 class ContainerService(
     private val loot: LootService,
     private val migration: MigrationService
 ) {
-    private val viewing = mutableSetOf<Player>()
+    private val viewing = ConcurrentHashMap.newKeySet<Player>()
 
     /**
      * Opens a loot container with a personal inventory, false if there is nothing to open

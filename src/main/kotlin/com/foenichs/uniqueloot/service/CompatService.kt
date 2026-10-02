@@ -15,6 +15,11 @@ class CompatService {
     private val lootTriggerMethod: Method
     private val asBukkitCopy: Method
 
+    /**
+     * Whether the server runs threading
+     */
+    val folia = runCatching { Class.forName("io.papermc.paper.threadedregions.RegionizedServer") }.isSuccess
+
     init {
         // CriteriaTriggers moved to its own package in 26.x
         val triggers = listOf("net.minecraft.advancements.triggers.CriteriaTriggers", "net.minecraft.advancements.CriteriaTriggers")

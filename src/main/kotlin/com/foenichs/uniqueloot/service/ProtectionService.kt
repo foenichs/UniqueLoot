@@ -1,5 +1,6 @@
 package com.foenichs.uniqueloot.service
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import net.minecraft.world.entity.vehicle.ContainerEntity
 import org.bukkit.GameMode
 import org.bukkit.Tag
@@ -18,12 +19,17 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.loot.LootTable
 import org.bukkit.loot.Lootable
+import org.bukkit.plugin.Plugin
 import org.bukkit.util.Vector
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
-class ProtectionService {
-    private val frozen = mutableSetOf<StorageMinecart>()
-    private val removing = mutableSetOf<UUID>()
+class ProtectionService(
+    private val plugin: Plugin,
+    private val compat: CompatService
+) {
+    private val frozen = ConcurrentHashMap<StorageMinecart, ScheduledTask>()
+    private val removing = ConcurrentHashMap.newKeySet<UUID>()
     private val horizontal = listOf(BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST)
 
     /**
@@ -63,16 +69,18 @@ class ProtectionService {
      * Removes a loot chest for a creative player who confirmed it
      */
     fun removeLootChest(player: Player, block: Block) {
-        if (!player.isOnline || player.gameMode != GameMode.CREATIVE || !isLootChest(block)) return
-        confirmed(player) { player.breakBlock(block) }
+        player.scheduler.run(plugin, {
+            if (player.gameMode == GameMode.CREATIVE && isLootChest(block)) confirmed(player) { player.breakBlock(block) }
+        }, null)
     }
 
     /**
      * Removes a loot minecart for a creative player who confirmed it
      */
     fun removeLootMinecart(player: Player, minecart: Entity) {
-        if (!player.isOnline || player.gameMode != GameMode.CREATIVE || minecart.isDead || !isLootMinecart(minecart)) return
-        confirmed(player) { player.attack(minecart) }
+        player.scheduler.run(plugin, {
+            if (player.gameMode == GameMode.CREATIVE && !minecart.isDead && isLootMinecart(minecart)) confirmed(player) { player.attack(minecart) }
+        }, null)
     }
 
     /**
@@ -106,43 +114,47 @@ class ProtectionService {
      */
     fun freeze(minecart: StorageMinecart) {
         minecart.maxSpeed = 0.0
-        frozen.add(minecart)
+        val task = minecart.scheduler.runAtFixedRate(plugin, { tick(minecart, it) }, { frozen.remove(minecart) }, 1L, 1L) ?: return
+        frozen.put(minecart, task)?.cancel()
     }
 
     /**
      * Stops tracking a loot minecart that left the world
      */
     fun release(minecart: StorageMinecart) {
-        frozen.remove(minecart)
+        frozen.remove(minecart)?.cancel()
     }
 
     /**
      * Gives all locked loot minecarts their vanilla speed limit back
      */
     fun unfreezeAll() {
-        frozen.forEach { (it as CraftMinecart).handle.maxSpeed = null }
+        // Plugins only unload with the server on Folia
+        if (compat.folia) return
+
+        frozen.forEach { (minecart, task) ->
+            task.cancel()
+            (minecart as CraftMinecart).handle.maxSpeed = null
+        }
         frozen.clear()
     }
 
     /**
      * Removes velocity from locked loot minecarts and unlocks those that lost their loot table
      */
-    fun tick() {
-        val minecarts = frozen.iterator()
-        while (minecarts.hasNext()) {
-            val minecart = minecarts.next()
-            val handle = (minecart as CraftMinecart).handle
-            // No longer a loot minecart
-            if ((handle as ContainerEntity).containerLootTable == null) {
-                handle.maxSpeed = null
-                minecarts.remove()
-                continue
-            }
-
-            val velocity = minecart.velocity
-            if (velocity.x * velocity.x + velocity.z * velocity.z < 1.0E-7) continue
-            minecart.velocity = Vector(0.0, velocity.y, 0.0)
+    private fun tick(minecart: StorageMinecart, task: ScheduledTask) {
+        val handle = (minecart as CraftMinecart).handle
+        // No longer a loot minecart
+        if ((handle as ContainerEntity).containerLootTable == null) {
+            handle.maxSpeed = null
+            frozen.remove(minecart)
+            task.cancel()
+            return
         }
+
+        val velocity = minecart.velocity
+        if (velocity.x * velocity.x + velocity.z * velocity.z < 1.0E-7) return
+        minecart.velocity = Vector(0.0, velocity.y, 0.0)
     }
 
     /**

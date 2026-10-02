@@ -39,7 +39,7 @@ class UniqueLoot : JavaPlugin() {
         val lootService = LootService(storage, compatService)
         migrationService = MigrationService(this)
         containerService = ContainerService(lootService, migrationService)
-        protectionService = ProtectionService()
+        protectionService = ProtectionService(this, compatService)
         val dialogService = DialogService()
 
         // Register Event Listeners
@@ -50,9 +50,6 @@ class UniqueLoot : JavaPlugin() {
         pluginManager.registerEvents(BlockProtectionListener(protectionService, dialogService), this)
         pluginManager.registerEvents(EntityProtectionListener(protectionService, dialogService), this)
         pluginManager.registerEvents(ExplosionProtectionListener(protectionService), this)
-
-        // Keep loot minecarts at rest
-        server.scheduler.runTaskTimer(this, Runnable { protectionService.tick() }, 1L, 1L)
 
         // bStats
         Metrics(this, 27274)

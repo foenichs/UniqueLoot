@@ -2,6 +2,7 @@ name: UniqueLoot
 version: '1.1'
 main: com.foenichs.uniqueloot.UniqueLoot
 api-version: '1.21.11'
+folia-supported: true
 prefix: "UniqueLoot"
 authors: ["foenichs"]
 description: Loot chests are unique for every player and can't be destroyed, so no one misses out on loot, no matter when they start playing.
