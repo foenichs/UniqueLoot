@@ -2,6 +2,7 @@ package com.foenichs.uniqueloot.listener.protection
 
 import com.foenichs.uniqueloot.service.DialogService
 import com.foenichs.uniqueloot.service.ProtectionService
+import io.papermc.paper.event.entity.ItemTransportingEntityValidateTargetEvent
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.GameMode
@@ -18,6 +19,7 @@ import org.bukkit.event.block.BlockPistonExtendEvent
 import org.bukkit.event.block.BlockPistonRetractEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.EntityChangeBlockEvent
+import org.bukkit.event.inventory.InventoryMoveItemEvent
 import org.bukkit.event.player.PlayerBucketEmptyEvent
 import org.bukkit.event.world.LootGenerateEvent
 
@@ -115,6 +117,22 @@ class BlockProtectionListener(
     @EventHandler(ignoreCancelled = true)
     fun onEntityChangeBlock(event: EntityChangeBlockEvent) {
         if (protection.isLootMinecartBase(event.block)) event.isCancelled = true
+    }
+
+    /**
+     * Prevent hoppers and droppers from moving items into or out of loot containers
+     */
+    @EventHandler(ignoreCancelled = true)
+    fun onItemMove(event: InventoryMoveItemEvent) {
+        if (protection.isLootInventory(event.source) || protection.isLootInventory(event.destination)) event.isCancelled = true
+    }
+
+    /**
+     * Prevent copper golems from targeting loot chests
+     */
+    @EventHandler(ignoreCancelled = true)
+    fun onTransportTarget(event: ItemTransportingEntityValidateTargetEvent) {
+        if (protection.isLootChest(event.block)) event.isAllowed = false
     }
 
     /**

@@ -8,11 +8,13 @@ import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.BlockState
 import org.bukkit.block.Chest
+import org.bukkit.block.DoubleChest
 import org.bukkit.block.data.type.Chest.Type
 import org.bukkit.craftbukkit.entity.CraftMinecart
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.entity.minecart.StorageMinecart
+import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.loot.LootTable
 import org.bukkit.loot.Lootable
@@ -36,6 +38,21 @@ class ProtectionService {
      * Whether the entity is a chest minecart with a loot table
      */
     fun isLootMinecart(entity: Entity) = entity is StorageMinecart && entity.lootTable != null
+
+    /**
+     * Whether the inventory belongs to a loot chest, barrel or chest minecart
+     */
+    fun isLootInventory(inventory: Inventory): Boolean {
+        val holder = inventory.getHolder(false)
+        if (holder is DoubleChest) return isLootHolder(holder.getLeftSide(false)) || isLootHolder(holder.getRightSide(false))
+        return isLootHolder(holder)
+    }
+
+    /**
+     * Whether the holder is a chest, barrel or chest minecart with a loot table
+     */
+    private fun isLootHolder(holder: InventoryHolder?) =
+        (holder is Chest || holder is Barrel || holder is StorageMinecart) && (holder as Lootable).lootTable != null
 
     /**
      * Whether the player is removing a loot container they confirmed
