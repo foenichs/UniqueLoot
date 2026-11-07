@@ -12,6 +12,7 @@ import com.foenichs.uniqueloot.service.DialogService
 import com.foenichs.uniqueloot.service.LootService
 import com.foenichs.uniqueloot.service.MigrationService
 import com.foenichs.uniqueloot.service.ProtectionService
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bstats.bukkit.Metrics
 import org.bukkit.plugin.java.JavaPlugin
 
@@ -55,6 +56,11 @@ class UniqueLoot : JavaPlugin() {
         pluginManager.registerEvents(BlockProtectionListener(protectionService, dialogService), this)
         pluginManager.registerEvents(EntityProtectionListener(protectionService, dialogService), this)
         pluginManager.registerEvents(ExplosionProtectionListener(protectionService), this)
+
+        // Register Commands
+        lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) {
+            it.registrar().register(UniqueLootCommand(configService).build())
+        }
 
         // bStats
         Metrics(this, 27274)
