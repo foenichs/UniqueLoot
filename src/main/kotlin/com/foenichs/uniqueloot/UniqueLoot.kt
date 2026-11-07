@@ -6,6 +6,7 @@ import com.foenichs.uniqueloot.listener.protection.BlockProtectionListener
 import com.foenichs.uniqueloot.listener.protection.EntityProtectionListener
 import com.foenichs.uniqueloot.listener.protection.ExplosionProtectionListener
 import com.foenichs.uniqueloot.service.CompatService
+import com.foenichs.uniqueloot.service.ConfigService
 import com.foenichs.uniqueloot.service.ContainerService
 import com.foenichs.uniqueloot.service.DialogService
 import com.foenichs.uniqueloot.service.LootService
@@ -32,11 +33,15 @@ class UniqueLoot : JavaPlugin() {
             return disableUnsupported(ex)
         }
 
+        // Initialize Config
+        saveDefaultConfig()
+        val configService = ConfigService(this)
+
         // Initialize Storage
         val storage = LootStorage(this, compatService)
 
         // Initialize Services
-        val lootService = LootService(storage, compatService)
+        val lootService = LootService(storage, compatService, configService)
         migrationService = MigrationService(this)
         containerService = ContainerService(lootService, migrationService)
         protectionService = ProtectionService(this, compatService)

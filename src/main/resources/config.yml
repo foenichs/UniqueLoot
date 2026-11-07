@@ -1,0 +1,11 @@
+auto-replenish:
+  # Whether loot containers are refilled after some time
+  enabled: false
+  # The minimum random time delay before a container can be refilled
+  minutes-min: 720
+  # The maximum random time delay before a container can be refilled
+  minutes-max: 2880
+  # How many times a container can refill for the same player, -1 for unlimited
+  max-refills: 1
+  # Whether only emptied containers refill, otherwise leftover items are replaced
+  require-emptied: true

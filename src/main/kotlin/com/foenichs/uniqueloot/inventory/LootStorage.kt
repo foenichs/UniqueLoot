@@ -12,6 +12,11 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
 import java.util.UUID
 
+/**
+ * When a player's container refills next, null if it won't, and how often it refilled already
+ */
+data class Refill(val at: Long?, val count: Int)
+
 class LootStorage(
     private val plugin: Plugin,
     private val compat: CompatService
@@ -21,6 +26,11 @@ class LootStorage(
      * Storage key of a player's items on the chest
      */
     private fun key(player: UUID) = NamespacedKey(plugin, player.toString())
+
+    /**
+     * Storage key of a player's refill data on the chest
+     */
+    private fun refillKey(player: UUID, name: String) = NamespacedKey(plugin, "$player/$name")
 
     /**
      * Persistent data of the block entity or entity holding the loot
@@ -45,6 +55,28 @@ class LootStorage(
     fun save(holder: Container, player: UUID, items: List<ItemStack>) {
         val bytes = org.bukkit.inventory.ItemStack.serializeItemsAsBytes(items.map(compat::toBukkit))
         data(holder).set(key(player), PersistentDataType.BYTE_ARRAY, bytes)
+        holder.setChanged()
+    }
+
+    /**
+     * Refill data of a player on the chest
+     */
+    fun refill(holder: Container, player: UUID): Refill {
+        val data = data(holder)
+        return Refill(
+            data.get(refillKey(player, "refill-at"), PersistentDataType.LONG),
+            data.get(refillKey(player, "refills"), PersistentDataType.INTEGER) ?: 0
+        )
+    }
+
+    /**
+     * Saves refill data of a player on the chest
+     */
+    fun saveRefill(holder: Container, player: UUID, refill: Refill) {
+        val data = data(holder)
+        if (refill.at != null) data.set(refillKey(player, "refill-at"), PersistentDataType.LONG, refill.at)
+        else data.remove(refillKey(player, "refill-at"))
+        data.set(refillKey(player, "refills"), PersistentDataType.INTEGER, refill.count)
         holder.setChanged()
     }
 }
