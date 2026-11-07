@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.BarrelBlock
 import net.minecraft.world.level.block.ChestBlock
 import net.minecraft.world.level.block.TrappedChestBlock
 import net.minecraft.world.level.block.entity.BaseContainerBlockEntity
+import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.gameevent.GameEvent
 import java.util.concurrent.ConcurrentHashMap
 
@@ -44,14 +45,15 @@ class ContainerService(
             else -> return false
         }
 
-        // Blocked containers have no provider
-        state.getMenuProvider(level, pos) ?: return false
         val real = when (block) {
-            is ChestBlock -> ChestBlock.getContainer(block, state, level, pos, false)
+            is ChestBlock -> ChestBlock.getContainer(block, state, level, pos, true)
             else -> level.getBlockEntity(pos) as? Container
         } ?: return false
         val halves = if (real is CompoundContainer) listOf(real.container1, real.container2) else listOf(real)
         if (halves.none { loot.hasLootTable(it) }) return false
+
+        // Blocked chests stay closed, loot containers above don't block
+        if (block is ChestBlock && halves.any { isBlocked(level, it) }) return false
 
         // Loot Chest or Loot Barrel
         val title = title(if (block is BarrelBlock) "container.barrel" else "container.chest")
@@ -61,6 +63,15 @@ class ContainerService(
             PiglinAi.angerNearbyPiglins(level, player, true)
         }
         return true
+    }
+
+    /**
+     * Whether a non-loot-container blocks the chest half from above
+     */
+    private fun isBlocked(level: ServerLevel, half: Container): Boolean {
+        val pos = (half as? BlockEntity)?.blockPos ?: return false
+        val above = level.getBlockEntity(pos.above()) as? Container
+        return ChestBlock.isChestBlockedAt(level, pos) && (above == null || !loot.hasLootTable(above))
     }
 
     /**
