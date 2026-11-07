@@ -7,3 +7,7 @@ prefix: "UniqueLoot"
 authors: ["foenichs"]
 description: Loot chests are unique for every player and can't be destroyed, so no one misses out on loot, no matter when they start playing.
 website: foenichs.com
+permissions:
+  uniqueloot.destroy:
+    description: Allows destroying loot containers while destroying is restricted.
+    default: false

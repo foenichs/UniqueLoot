@@ -5,7 +5,6 @@ import com.foenichs.uniqueloot.service.ProtectionService
 import io.papermc.paper.event.entity.ItemTransportingEntityValidateTargetEvent
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
-import org.bukkit.GameMode
 import org.bukkit.block.Barrel
 import org.bukkit.block.Chest
 import org.bukkit.entity.minecart.StorageMinecart
@@ -98,7 +97,7 @@ class BlockProtectionListener(
      */
     @EventHandler(ignoreCancelled = true)
     fun onBucketEmpty(event: PlayerBucketEmptyEvent) {
-        if (event.player.gameMode == GameMode.CREATIVE) return
+        if (protection.canDestroy(event.player)) return
         if (protection.isLootMinecartBase(event.block)) event.isCancelled = true
     }
 

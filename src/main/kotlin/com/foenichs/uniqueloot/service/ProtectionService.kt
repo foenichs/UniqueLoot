@@ -73,9 +73,9 @@ class ProtectionService(
     fun isRemoving(player: Player) = player.uniqueId in removing
 
     /**
-     * Whether the player may destroy loot containers, creative players always can
+     * Whether the player may destroy loot containers
      */
-    fun canDestroy(player: Player) = !restricted || player.gameMode == GameMode.CREATIVE
+    fun canDestroy(player: Player) = !restricted || player.gameMode == GameMode.CREATIVE || player.hasPermission("uniqueloot.destroy")
 
     /**
      * Removes a loot chest for a player who confirmed it
