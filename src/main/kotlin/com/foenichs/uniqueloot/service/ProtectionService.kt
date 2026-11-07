@@ -3,6 +3,7 @@ package com.foenichs.uniqueloot.service
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import net.minecraft.world.entity.vehicle.ContainerEntity
 import org.bukkit.GameMode
+import org.bukkit.Material
 import org.bukkit.Tag
 import org.bukkit.block.Barrel
 import org.bukkit.block.Block
@@ -10,6 +11,7 @@ import org.bukkit.block.BlockFace
 import org.bukkit.block.BlockState
 import org.bukkit.block.Chest
 import org.bukkit.block.DoubleChest
+import org.bukkit.block.data.Directional
 import org.bukkit.block.data.type.Chest.Type
 import org.bukkit.craftbukkit.entity.CraftMinecart
 import org.bukkit.entity.Entity
@@ -17,6 +19,7 @@ import org.bukkit.entity.Player
 import org.bukkit.entity.minecart.StorageMinecart
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
+import org.bukkit.inventory.ItemStack
 import org.bukkit.loot.LootTable
 import org.bukkit.loot.Lootable
 import org.bukkit.plugin.Plugin
@@ -26,9 +29,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 class ProtectionService(
     private val plugin: Plugin,
-    private val compat: CompatService
+    private val compat: CompatService,
+    private val config: ConfigService
 ) {
+    val restricted get() = config.restricted
+    val confirmation get() = config.confirmation
     private val frozen = ConcurrentHashMap<StorageMinecart, ScheduledTask>()
+    private val railed = ConcurrentHashMap.newKeySet<StorageMinecart>()
     private val removing = ConcurrentHashMap.newKeySet<UUID>()
     private val horizontal = listOf(BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST)
 
@@ -66,20 +73,40 @@ class ProtectionService(
     fun isRemoving(player: Player) = player.uniqueId in removing
 
     /**
-     * Removes a loot chest for a creative player who confirmed it
+     * Whether the player may destroy loot containers, creative players always can
+     */
+    fun canDestroy(player: Player) = !restricted || player.gameMode == GameMode.CREATIVE
+
+    /**
+     * Removes a loot chest for a player who confirmed it
      */
     fun removeLootChest(player: Player, block: Block) {
         player.scheduler.run(plugin, {
-            if (player.gameMode == GameMode.CREATIVE && isLootChest(block)) confirmed(player) { player.breakBlock(block) }
+            if (canDestroy(player) && isLootChest(block)) confirmed(player) { player.breakBlock(block) }
         }, null)
     }
 
     /**
-     * Removes a loot minecart for a creative player who confirmed it
+     * Removes a loot minecart for a player who confirmed it
      */
     fun removeLootMinecart(player: Player, minecart: Entity) {
         player.scheduler.run(plugin, {
-            if (player.gameMode == GameMode.CREATIVE && !minecart.isDead && isLootMinecart(minecart)) confirmed(player) { player.attack(minecart) }
+            if (canDestroy(player) && !minecart.isDead && isLootMinecart(minecart)) confirmed(player) {
+                val handle = (minecart as CraftMinecart).handle
+                handle.damage = 40f
+                player.attack(minecart)
+                // The hit was cancelled elsewhere
+                if (!minecart.isDead) handle.damage = 0f
+            }
+        }, null)
+    }
+
+    /**
+     * Breaks the rail or support of a loot minecart for a player who confirmed it
+     */
+    fun removeSupport(player: Player, block: Block) {
+        player.scheduler.run(plugin, {
+            if (canDestroy(player) && lootMinecartOf(block) != null) confirmed(player) { player.breakBlock(block) }
         }, null)
     }
 
@@ -96,17 +123,22 @@ class ProtectionService(
     }
 
     /**
-     * Whether the block is the rail or the block below the rail of a loot minecart
+     * Whether the block supports a loot minecart while destroying is restricted
      */
-    fun isLootMinecartBase(block: Block) = hasLootMinecart(block) || hasLootMinecart(block.getRelative(BlockFace.UP))
+    fun isLootMinecartBase(block: Block) = restricted && lootMinecartOf(block) != null
 
     /**
-     * Whether a loot minecart sits on the rail block
+     * The loot minecart on the rail block or the block below it
      */
-    private fun hasLootMinecart(rail: Block): Boolean {
-        if (!Tag.RAILS.isTagged(rail.type)) return false
+    fun lootMinecartOf(block: Block) = lootMinecartOn(block) ?: lootMinecartOn(block.getRelative(BlockFace.UP))
+
+    /**
+     * The loot minecart that sits on the rail block
+     */
+    private fun lootMinecartOn(rail: Block): StorageMinecart? {
+        if (!Tag.RAILS.isTagged(rail.type)) return null
         return rail.world.getNearbyEntitiesByType(StorageMinecart::class.java, rail.location.add(0.5, 0.5, 0.5), 0.5)
-            .any { isLootMinecart(it) && it.location.block == rail }
+            .firstOrNull { isLootMinecart(it) && it.location.block == rail }
     }
 
     /**
@@ -119,10 +151,33 @@ class ProtectionService(
     }
 
     /**
+     * Breaks a loot minecart, only the empty minecart drops
+     */
+    private fun dropLootMinecart(minecart: StorageMinecart) {
+        minecart.world.dropItemNaturally(minecart.location, ItemStack(Material.CHEST_MINECART))
+        minecart.remove()
+    }
+
+    /**
+     * Breaks the loot minecarts a piston is about to move
+     */
+    fun dropPushedLootMinecarts(piston: Block, blocks: List<Block>, extending: Boolean) {
+        if (frozen.isEmpty()) return
+        val facing = (piston.blockData as? Directional)?.facing ?: return
+        val direction = if (extending) facing else facing.oppositeFace
+
+        // Moved blocks, their landing cells and the head
+        val cells = blocks.flatMap { listOf(it, it.getRelative(direction)) }.toMutableSet()
+        if (extending) cells += piston.getRelative(facing)
+        frozen.keys.filter { it.world == piston.world && it.location.block in cells }.forEach { dropLootMinecart(it) }
+    }
+
+    /**
      * Stops tracking a loot minecart that left the world
      */
     fun release(minecart: StorageMinecart) {
         frozen.remove(minecart)?.cancel()
+        railed.remove(minecart)
     }
 
     /**
@@ -140,7 +195,7 @@ class ProtectionService(
     }
 
     /**
-     * Removes velocity from locked loot minecarts and unlocks those that lost their loot table
+     * Keeps loot minecarts still, unlocks those without loot table and breaks those without rail
      */
     private fun tick(minecart: StorageMinecart, task: ScheduledTask) {
         val handle = (minecart as CraftMinecart).handle
@@ -148,7 +203,16 @@ class ProtectionService(
         if ((handle as ContainerEntity).containerLootTable == null) {
             handle.maxSpeed = null
             frozen.remove(minecart)
+            railed.remove(minecart)
             task.cancel()
+            return
+        }
+
+        // Minecart breaks together with its rail
+        if (Tag.RAILS.isTagged(minecart.location.block.type)) {
+            railed.add(minecart)
+        } else if (railed.remove(minecart)) {
+            dropLootMinecart(minecart)
             return
         }
 

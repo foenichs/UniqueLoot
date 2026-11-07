@@ -45,7 +45,7 @@ class UniqueLoot : JavaPlugin() {
         val lootService = LootService(storage, compatService, configService)
         migrationService = MigrationService(this)
         containerService = ContainerService(lootService, migrationService)
-        protectionService = ProtectionService(this, compatService)
+        protectionService = ProtectionService(this, compatService, configService)
         val dialogService = DialogService()
 
         // Register Event Listeners

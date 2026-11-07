@@ -1,3 +1,9 @@
+destroying:
+  # Whether only creative players can destroy loot containers (also prevents explosions etc.)
+  restricted: true
+  # Whether players have to confirm before destroying a loot container
+  confirmation: true
+
 auto-replenish:
   # Whether loot containers are refilled after some time
   enabled: false
@@ -5,7 +11,7 @@ auto-replenish:
   minutes-min: 720
   # The maximum random time delay before a container can be refilled
   minutes-max: 2880
-  # How many times a container can refill for the same player, -1 for unlimited
+  # How many times a container can refill for the same player (-1 for unlimited)
   max-refills: 1
   # Whether only emptied containers refill, otherwise leftover items are replaced
   require-emptied: true

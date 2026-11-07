@@ -6,7 +6,6 @@ import com.foenichs.uniqueloot.service.DialogService
 import com.foenichs.uniqueloot.service.ProtectionService
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
-import org.bukkit.GameMode
 import org.bukkit.entity.Player
 import org.bukkit.entity.minecart.StorageMinecart
 import org.bukkit.event.EventHandler
@@ -46,7 +45,7 @@ class EntityProtectionListener(
     }
 
     /**
-     * Prevent loot minecarts from being damaged and destroyed, creative players have to confirm
+     * Loot minecarts being damaged and destroyed
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onVehicleDamage(event: VehicleDamageEvent) {
@@ -56,9 +55,13 @@ class EntityProtectionListener(
         val player = event.attacker as? Player
         if (player != null && protection.isRemoving(player)) return
 
+        // Skip the confirmation
+        val allowed = player != null && protection.canDestroy(player)
+        if (allowed && !protection.confirmation) return
+
         event.isCancelled = true
         if (player == null) return
-        if (player.gameMode != GameMode.CREATIVE) {
+        if (!allowed) {
             player.sendActionBar(
                 Component.text("You can't destroy loot containers.", NamedTextColor.RED)
             )

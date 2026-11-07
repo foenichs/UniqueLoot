@@ -8,6 +8,7 @@ import io.papermc.paper.registry.data.dialog.body.DialogBody
 import io.papermc.paper.registry.data.dialog.type.DialogType
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickCallback
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.entity.Player
 
 @Suppress("UnstableApiUsage")
@@ -21,7 +22,8 @@ class DialogService {
             b.empty().base(
                 DialogBase.builder(Component.text("Unique Loot"))
                     .body(listOf(DialogBody.plainMessage(
-                        Component.text("Are you sure you want to remove this loot container?"), 160
+                        Component.text("Are you sure you want to remove this loot container?")
+                            .append(Component.text(" No loot will be dropped.", NamedTextColor.GRAY)), 160
                     )))
                     .build()
             ).type(

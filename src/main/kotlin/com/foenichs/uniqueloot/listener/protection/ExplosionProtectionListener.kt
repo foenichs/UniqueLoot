@@ -15,6 +15,7 @@ class ExplosionProtectionListener(
      */
     @EventHandler
     fun onBlockExplode(event: BlockExplodeEvent) {
+        if (!protection.restricted) return
         event.blockList().removeIf { protection.isLootChest(it) || protection.isLootMinecartBase(it) }
     }
 
@@ -23,6 +24,7 @@ class ExplosionProtectionListener(
      */
     @EventHandler
     fun onEntityExplode(event: EntityExplodeEvent) {
+        if (!protection.restricted) return
         event.blockList().removeIf { protection.isLootChest(it) || protection.isLootMinecartBase(it) }
     }
 }

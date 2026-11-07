@@ -40,7 +40,7 @@ class BlockProtectionListener(
     }
 
     /**
-     * Prevent players from breaking loot chests, creative players have to confirm
+     * Players breaking loot chests
      */
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
@@ -48,8 +48,12 @@ class BlockProtectionListener(
         val block = event.block
         if (!protection.isLootChest(block) || protection.isRemoving(player)) return
 
+        // Skip the confirmation
+        val allowed = protection.canDestroy(player)
+        if (allowed && !protection.confirmation) return
+
         event.isCancelled = true
-        if (player.gameMode != GameMode.CREATIVE) {
+        if (!allowed) {
             player.sendActionBar(
                 Component.text("You can't destroy loot containers.", NamedTextColor.RED)
             )
@@ -59,15 +63,26 @@ class BlockProtectionListener(
     }
 
     /**
-     * Prevent players from breaking the rail or support of a loot minecart
+     * Players breaking support blocks of a loot minecart
      */
     @EventHandler(ignoreCancelled = true)
     fun onMinecartBaseBreak(event: BlockBreakEvent) {
-        if (event.player.gameMode == GameMode.CREATIVE || !protection.isLootMinecartBase(event.block)) return
+        val player = event.player
+        val block = event.block
+        if (protection.lootMinecartOf(block) == null || protection.isRemoving(player)) return
+
+        if (!protection.canDestroy(player)) {
+            event.isCancelled = true
+            player.sendActionBar(
+                Component.text("You can't break support blocks of loot containers.", NamedTextColor.RED)
+            )
+            return
+        }
+
+        // Skip the confirmation
+        if (!protection.confirmation) return
         event.isCancelled = true
-        event.player.sendActionBar(
-            Component.text("You can't break support blocks of loot containers.", NamedTextColor.RED)
-        )
+        dialogs.confirmRemoval(player) { protection.removeSupport(player, block) }
     }
 
     /**
@@ -88,19 +103,27 @@ class BlockProtectionListener(
     }
 
     /**
-     * Prevent pistons pushing the rail or support of a loot minecart
+     * Pistons pushing loot minecarts or their rail and support
      */
     @EventHandler(ignoreCancelled = true)
     fun onPistonExtend(event: BlockPistonExtendEvent) {
-        if (event.blocks.any { protection.isLootMinecartBase(it) }) event.isCancelled = true
+        if (event.blocks.any { protection.isLootMinecartBase(it) }) {
+            event.isCancelled = true
+            return
+        }
+        protection.dropPushedLootMinecarts(event.block, event.blocks, true)
     }
 
     /**
-     * Prevent pistons pulling the rail or support of a loot minecart
+     * Pistons pulling loot minecarts or their rail and support
      */
     @EventHandler(ignoreCancelled = true)
     fun onPistonRetract(event: BlockPistonRetractEvent) {
-        if (event.blocks.any { protection.isLootMinecartBase(it) }) event.isCancelled = true
+        if (event.blocks.any { protection.isLootMinecartBase(it) }) {
+            event.isCancelled = true
+            return
+        }
+        protection.dropPushedLootMinecarts(event.block, event.blocks, false)
     }
 
     /**
