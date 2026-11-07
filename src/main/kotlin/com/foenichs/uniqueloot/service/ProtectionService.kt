@@ -222,11 +222,11 @@ class ProtectionService(
     }
 
     /**
-     * Restores the loot table cleared by Paper (Paper#12998)
+     * Restores the loot table cleared by Paper (Paper#12998), tables unknown to Bukkit are null
      */
-    fun restoreLootTable(holder: InventoryHolder, table: LootTable) {
+    fun restoreLootTable(holder: InventoryHolder, table: LootTable?) {
         val live = if (holder is BlockState) holder.block.getState(false) else holder
-        if (live is Lootable) live.lootTable = table
+        if (table != null && live is Lootable) live.lootTable = table
     }
 
     /**
